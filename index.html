@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111214" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Last Done</title>
+<style>
+  :root {
+    --bg: #f5f5f7;
+    --card: #ffffff;
+    --text: #1c1c1e;
+    --muted: #6e6e73;
+    --border: #e3e3e8;
+    --accent: #2f7d5b;
+    --accent-soft: rgba(47, 125, 91, 0.16);
+    --danger: #c0392b;
+    --shadow: 0 1px 2px rgba(0,0,0,0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111214;
+      --card: #1c1d20;
+      --text: #f2f2f4;
+      --muted: #9a9aa2;
+      --border: #2c2d31;
+      --accent: #4cc38a;
+      --accent-soft: rgba(76, 195, 138, 0.2);
+      --danger: #ff6b5e;
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    -webkit-tap-highlight-color: transparent;
+  }
+  main { max-width: 560px; margin: 0 auto; padding: 16px; }
+  header {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 12px; margin: 8px 0 16px;
+  }
+  h1 { font-size: 28px; margin: 0; letter-spacing: -0.02em; }
+  .sort {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 14px;
+  }
+  form.add { display: flex; gap: 8px; margin-bottom: 16px; }
+  form.add input {
+    flex: 1; min-width: 0; font: inherit; font-size: 16px; color: var(--text);
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 14px; outline: none;
+  }
+  form.add input:focus { border-color: var(--accent); }
+  form.add button {
+    font: inherit; font-weight: 600; border: 0; border-radius: 12px;
+    padding: 0 18px; background: var(--accent); color: #fff;
+  }
+  .hint { color: var(--muted); font-size: 13px; margin: 0 0 12px; text-align: center; }
+  ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  li.item {
+    position: relative; overflow: hidden;
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    box-shadow: var(--shadow);
+    display: flex; align-items: center; gap: 8px;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+    touch-action: pan-y;
+    transition: transform 0.15s ease;
+  }
+  li.item.pressing { transform: scale(0.98); }
+  li.item .fill {
+    position: absolute; inset: 0; background: var(--accent-soft);
+    transform-origin: left; transform: scaleX(0); pointer-events: none;
+  }
+  li.item.pressing .fill { transform: scaleX(1); transition: transform var(--hold) linear; }
+  li.item.flash { animation: flash 0.6s ease; }
+  @keyframes flash { 0% { background: var(--accent-soft); } 100% { background: var(--card); } }
+  .body { position: relative; flex: 1; min-width: 0; padding: 14px 0 14px 16px; }
+  .name { font-weight: 600; overflow-wrap: anywhere; }
+  .when { color: var(--muted); font-size: 14px; margin-top: 2px; }
+  .when.never { font-style: italic; }
+  .menu-btn {
+    position: relative; background: none; border: 0; color: var(--muted);
+    font-size: 22px; line-height: 1; padding: 14px 16px; align-self: stretch;
+  }
+  .empty { text-align: center; color: var(--muted); padding: 40px 16px; }
+  .toast {
+    position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom));
+    transform: translate(-50%, 150%); transition: transform 0.2s ease;
+    background: var(--text); color: var(--bg); border-radius: 12px;
+    padding: 10px 10px 10px 16px; display: flex; align-items: center; gap: 12px;
+    max-width: calc(100vw - 32px); box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  }
+  .toast.show { transform: translate(-50%, 0); }
+  .toast span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .toast button {
+    background: none; border: 0; color: var(--accent); font: inherit; font-weight: 700;
+    padding: 6px 8px;
+  }
+  dialog {
+    border: 0; border-radius: 16px; padding: 20px; width: min(92vw, 400px);
+    background: var(--card); color: var(--text);
+  }
+  dialog::backdrop { background: rgba(0,0,0,0.4); }
+  dialog h2 { margin: 0 0 12px; font-size: 18px; }
+  dialog label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 4px; }
+  dialog input {
+    width: 100%; font: inherit; font-size: 16px; color: var(--text); background: var(--bg);
+    border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+  }
+  dialog .row { display: flex; gap: 8px; margin-top: 18px; }
+  dialog .row button {
+    flex: 1; font: inherit; font-weight: 600; border-radius: 10px; padding: 11px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text);
+  }
+  dialog .row button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  dialog .row button.danger { color: var(--danger); }
+  dialog .sub { font-size: 13px; color: var(--muted); margin: 0; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Last Done</h1>
+    <button class="sort" id="sortBtn" type="button"></button>
+  </header>
+
+  <form class="add" id="addForm" autocomplete="off">
+    <input id="addInput" type="text" placeholder="Add something to track…" maxlength="80" enterkeyhint="done">
+    <button type="submit">Add</button>
+  </form>
+
+  <p class="hint" id="hint">Press and hold an item to mark it done now.</p>
+  <ul id="list"></ul>
+  <div class="empty" id="empty" hidden>Nothing tracked yet.<br>Add things like “Watered plants” or “Changed sheets”.</div>
+</main>
+
+<div class="toast" id="toast" role="status"><span id="toastText"></span><button id="undoBtn" type="button">Undo</button></div>
+
+<dialog id="editDialog">
+  <form method="dialog" id="editForm">
+    <h2>Edit item</h2>
+    <label for="editName">Name</label>
+    <input id="editName" type="text" maxlength="80" required>
+    <label for="editWhen">Last done</label>
+    <input id="editWhen" type="datetime-local">
+    <p class="sub">Clear the date to mark as never done.</p>
+    <div class="row">
+      <button type="button" class="danger" id="deleteBtn">Delete</button>
+      <button type="button" id="cancelBtn">Cancel</button>
+      <button type="submit" class="primary" value="save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(() => {
+  const STORAGE_KEY = 'lastDoneTracker.v1';
+  const HOLD_MS = 600;
+  const MOVE_TOLERANCE = 10;
+
+  const $ = (id) => document.getElementById(id);
+  const listEl = $('list'), emptyEl = $('empty'), hintEl = $('hint');
+  document.documentElement.style.setProperty('--hold', HOLD_MS + 'ms');
+
+  // ---- storage ----
+  function load() {
+    try {
+      const data = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      if (data && Array.isArray(data.items)) return data;
+    } catch (e) {}
+    return { items: [], sort: 'oldest' };
+  }
+  const state = load();
+  function save() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+  // ---- formatting ----
+  function relative(ts) {
+    if (ts == null) return 'Never done';
+    const s = Math.max(0, (Date.now() - ts) / 1000);
+    if (s < 45) return 'Just now';
+    const units = [['year', 31557600], ['month', 2629800], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60]];
+    for (const [name, secs] of units) {
+      const n = Math.floor(s / secs);
+      if (n >= 1) return `${n} ${name}${n === 1 ? '' : 's'} ago`;
+    }
+    return '1 minute ago';
+  }
+  function absolute(ts) {
+    return new Date(ts).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  }
+
+  // ---- sorting ----
+  const SORTS = {
+    oldest: { label: 'Oldest first', fn: (a, b) => (a.lastDone ?? -Infinity) - (b.lastDone ?? -Infinity) },
+    newest: { label: 'Newest first', fn: (a, b) => (b.lastDone ?? -Infinity) - (a.lastDone ?? -Infinity) },
+    name:   { label: 'A–Z', fn: (a, b) => a.name.localeCompare(b.name) },
+  };
+  const SORT_ORDER = Object.keys(SORTS);
+  if (!SORTS[state.sort]) state.sort = 'oldest';
+
+  // ---- render ----
+  function render() {
+    $('sortBtn').textContent = SORTS[state.sort].label;
+    const items = [...state.items].sort(SORTS[state.sort].fn);
+    listEl.replaceChildren(...items.map(renderItem));
+    emptyEl.hidden = items.length > 0;
+    hintEl.hidden = items.length === 0;
+  }
+  function renderItem(item) {
+    const li = document.createElement('li');
+    li.className = 'item';
+    li.dataset.id = item.id;
+    li.innerHTML = `<div class="fill"></div>
+      <div class="body"><div class="name"></div><div class="when"></div></div>
+      <button class="menu-btn" type="button" aria-label="Edit">⋯</button>`;
+    li.querySelector('.name').textContent = item.name;
+    const when = li.querySelector('.when');
+    when.textContent = relative(item.lastDone);
+    when.classList.toggle('never', item.lastDone == null);
+    if (item.lastDone != null) when.title = absolute(item.lastDone);
+    return li;
+  }
+  function refreshTimes() {
+    for (const li of listEl.children) {
+      const item = state.items.find((i) => i.id === li.dataset.id);
+      if (item) li.querySelector('.when').textContent = relative(item.lastDone);
+    }
+  }
+  setInterval(refreshTimes, 30000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshTimes(); });
+
+  // ---- add ----
+  $('addForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = $('addInput').value.trim();
+    if (!name) return;
+    state.items.push({ id: uid(), name, lastDone: null, created: Date.now() });
+    save(); render();
+    $('addInput').value = '';
+  });
+
+  $('sortBtn').addEventListener('click', () => {
+    state.sort = SORT_ORDER[(SORT_ORDER.indexOf(state.sort) + 1) % SORT_ORDER.length];
+    save(); render();
+  });
+
+  // ---- press and hold ----
+  let press = null;
+  function cancelPress() {
+    if (!press) return;
+    clearTimeout(press.timer);
+    press.li.classList.remove('pressing');
+    press = null;
+  }
+  listEl.addEventListener('pointerdown', (e) => {
+    const li = e.target.closest('li.item');
+    if (!li || e.target.closest('.menu-btn') || e.button > 0) return;
+    cancelPress();
+    li.classList.add('pressing');
+    press = {
+      li, x: e.clientX, y: e.clientY, pointerId: e.pointerId,
+      timer: setTimeout(() => { const id = li.dataset.id; cancelPress(); markDone(id); }, HOLD_MS),
+    };
+  });
+  listEl.addEventListener('pointermove', (e) => {
+    if (press && e.pointerId === press.pointerId &&
+        Math.hypot(e.clientX - press.x, e.clientY - press.y) > MOVE_TOLERANCE) cancelPress();
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => listEl.addEventListener(t, cancelPress));
+  window.addEventListener('scroll', cancelPress, { passive: true });
+  listEl.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  function markDone(id) {
+    const item = state.items.find((i) => i.id === id);
+    if (!item) return;
+    const previous = item.lastDone;
+    item.lastDone = Date.now();
+    save(); render();
+    const li = listEl.querySelector(`[data-id="${CSS.escape(id)}"]`);
+    if (li) { li.classList.add('flash'); li.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+    if (navigator.vibrate) navigator.vibrate(30);
+    showToast(`“${item.name}” done`, () => {
+      item.lastDone = previous;
+      save(); render();
+    });
+  }
+
+  // ---- toast / undo ----
+  let toastTimer = null, undoFn = null;
+  function showToast(text, onUndo) {
+    $('toastText').textContent = text;
+    undoFn = onUndo;
+    $('toast').classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 5000);
+  }
+  function hideToast() { $('toast').classList.remove('show'); undoFn = null; }
+  $('undoBtn').addEventListener('click', () => { if (undoFn) undoFn(); hideToast(); });
+
+  // ---- edit dialog ----
+  const dialog = $('editDialog');
+  let editingId = null;
+  const pad = (n) => String(n).padStart(2, '0');
+  function toLocalInput(ts) {
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  listEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('.menu-btn');
+    if (!btn) return;
+    const item = state.items.find((i) => i.id === btn.closest('li').dataset.id);
+    if (!item) return;
+    editingId = item.id;
+    $('editName').value = item.name;
+    $('editWhen').value = item.lastDone != null ? toLocalInput(item.lastDone) : '';
+    $('editWhen').max = toLocalInput(Date.now());
+    dialog.showModal();
+  });
+  $('editForm').addEventListener('submit', () => {
+    const item = state.items.find((i) => i.id === editingId);
+    if (!item) return;
+    const name = $('editName').value.trim();
+    if (name) item.name = name;
+    const whenVal = $('editWhen').value;
+    item.lastDone = whenVal ? new Date(whenVal).getTime() : null;
+    save(); render();
+  });
+  $('cancelBtn').addEventListener('click', () => dialog.close());
+  $('deleteBtn').addEventListener('click', () => {
+    const idx = state.items.findIndex((i) => i.id === editingId);
+    if (idx === -1) return;
+    const [removed] = state.items.splice(idx, 1);
+    save(); render();
+    dialog.close();
+    showToast(`Deleted “${removed.name}”`, () => {
+      state.items.splice(idx, 0, removed);
+      save(); render();
+    });
+  });
+
+  // Keep in sync across tabs
+  window.addEventListener('storage', (e) => {
+    if (e.key !== STORAGE_KEY) return;
+    Object.assign(state, load());
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
